@@ -1,10 +1,9 @@
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
-from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from httpx import HTTPError
 from pydantic import BaseModel, Field
-from requests import RequestException
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -25,9 +24,10 @@ class RetrievalRequest(BaseModel):
     top_k: int = Field(default=5, ge=1)
     model: str = DEFAULT_MODEL
     max_tokens: int = Field(default=500, ge=1)
-    api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    api_key: str = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY", "")
     double_check: bool = False
     show_context: bool = False
+    history: list[dict[str, str]] = Field(default_factory=list)
 
 
 class RetrievalResponse(BaseModel):
@@ -73,32 +73,32 @@ def read_root():
 async def rag_retrieve(payload: RetrievalRequest):
     try:
         print(f"Received question: {payload}")
-        apiKey = await run_in_threadpool(resolveApiKey, payload.api_key)
-        pipelineResult = await run_in_threadpool(
-            runRetrieval,
+        conversationTurns = payload.history
+        apiKey = resolveApiKey(payload.api_key)
+        pipelineResult = await runRetrieval(
             payload.question,
             payload.model,
             payload.top_k,
             payload.source,
             apiKey,
+            conversationTurns,
         )
         formattedContext = pipelineResult["context"]
 
-        firstMessageDict = await run_in_threadpool(
-            requestAnswerMessage,
+        firstMessageDict = await requestAnswerMessage(
             payload.question,
             formattedContext,
             payload.model,
             payload.max_tokens,
             apiKey,
+            conversationTurns,
         )
         firstAnswerRaw = firstMessageDict.get("content", "")
         firstAnswerNormalized = normalizeContentValue(firstAnswerRaw)
         finalAnswer = firstAnswerNormalized.strip()
 
         if payload.double_check:
-            finalAnswer = await run_in_threadpool(
-                requestSecondPass,
+            finalAnswer = await requestSecondPass(
                 payload.question,
                 firstMessageDict,
                 payload.model,
@@ -116,7 +116,7 @@ async def rag_retrieve(payload: RetrievalRequest):
         return responsePayload
     except RuntimeError as runtimeError:
         raise HTTPException(status_code=400, detail=str(runtimeError)) from runtimeError
-    except RequestException as requestError:
+    except HTTPError as requestError:
         raise HTTPException(status_code=502, detail=f"LLM request failed: {requestError}") from requestError
     except Exception as unknownError:
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {unknownError}") from unknownError

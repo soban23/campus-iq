@@ -24,14 +24,14 @@ def formatChunksAsContext(parsedChunks):
     return fullContext
 
 
-def runRetrievalPipeline(rawQuestion, llmClient, modelName, chromaCollection, topK, sourceFile):
-    expandedQuestion = expandQuery(rawQuestion, llmClient, modelName)
-    hydePassage = generateHydePassage(expandedQuestion, llmClient, modelName)
-    retrievedChunks = retrieveChunks(chromaCollection, hydePassage, topK, sourceFile)
-    formattedContext = formatChunksAsContext(retrievedChunks)
-    pipelineResult = {}
-    pipelineResult["expandedQuestion"] = expandedQuestion
-    pipelineResult["hydePassage"] = hydePassage
-    pipelineResult["chunks"] = retrievedChunks
-    pipelineResult["context"] = formattedContext
-    return pipelineResult
+# def runRetrievalPipeline(rawQuestion, llmClient, modelName, chromaCollection, topK, sourceFile):
+#     expandedQuestion = expandQuery(rawQuestion, llmClient, modelName)
+#     hydePassage = generateHydePassage(expandedQuestion, llmClient, modelName)
+#     retrievedChunks = retrieveChunks(chromaCollection, hydePassage, topK, sourceFile)
+#     formattedContext = formatChunksAsContext(retrievedChunks)
+#     pipelineResult = {}
+#     pipelineResult["expandedQuestion"] = expandedQuestion
+#     pipelineResult["hydePassage"] = hydePassage
+#     pipelineResult["chunks"] = retrievedChunks
+#     pipelineResult["context"] = formattedContext
+#     return pipelineResult

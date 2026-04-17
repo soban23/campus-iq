@@ -1,8 +1,10 @@
 import argparse
+import asyncio
 import os
 
 import chromadb
-import requests
+import httpx
+from google import genai
 
 from retrieval.answer import buildAnswerMessages
 from retrieval.expander import buildExpanderMessages
@@ -13,10 +15,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-CHROMA_PATH = "./chroma_db"
-COLLECTION_NAME = "uni_documents_2025"
-OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
-DEFAULT_MODEL = "nvidia/nemotron-3-super-120b-a12b:free"
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma_db")
+COLLECTION_NAME = os.getenv("COLLECTION_NAME", "uni_documents_2025")
+DEFAULT_MODEL = os.getenv("DEFAULT_MODEL", "gemini-2.5-flash")
+GROK_API_URL = os.getenv("GROK_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+GROK_BACKUP_MODEL = os.getenv("GROK_BACKUP_MODEL", "llama-3.3-70b-versatile")
 
 
 def buildArgumentParser():
@@ -36,12 +39,22 @@ def resolveApiKey(cliApiKey):
     if cliApiKey is not None:
         if cliApiKey.strip() != "":
             return cliApiKey
-    envApiKey = os.getenv("OPENROUTER_API_KEY")
+    envApiKey = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY")
     if envApiKey is None:
-        raise RuntimeError("OPENROUTER_API_KEY is missing. Set env var or pass --api-key.")
+        raise RuntimeError("GOOGLE_GENERATIVE_AI_API_KEY is missing. Set env var or pass --api-key.")
     if envApiKey.strip() == "":
-        raise RuntimeError("OPENROUTER_API_KEY is empty. Set env var or pass --api-key.")
+        raise RuntimeError("GOOGLE_GENERATIVE_AI_API_KEY is empty. Set env var or pass --api-key.")
     return envApiKey
+
+
+def resolveGrokApiKey():
+    grokApiKey = os.getenv("GROK_API_KEY", "")
+    if grokApiKey.strip() != "":
+        return grokApiKey
+    groqApiKey = os.getenv("GROQ_API_KEY", "")
+    if groqApiKey.strip() != "":
+        return groqApiKey
+    return ""
 
 
 def createCollection():
@@ -50,16 +63,81 @@ def createCollection():
     return collection
 
 
-def postChatCompletion(messagesList, modelName, maxTokens, apiKey):
-    authorizationValue = "Bearer " + apiKey
-    contentTypeValue = "application/json"
-    headers = {"Authorization": authorizationValue, "Content-Type": contentTypeValue}
-    reasoningValue = {"enabled": True}
-    payload = {"model": modelName, "messages": messagesList, "max_tokens": maxTokens, "reasoning": reasoningValue}
-    response = requests.post(url=OPENROUTER_URL, headers=headers, json=payload, timeout=120)
-    response.raise_for_status()
-    responseJson = response.json()
-    return responseJson
+async def postChatCompletion(messagesList, modelName, maxTokens, apiKey, requestLabel="chat"):
+    def normalizeMessageContent(rawValue):
+        if rawValue is None:
+            return ""
+        if isinstance(rawValue, str):
+            return rawValue
+        if not isinstance(rawValue, list):
+            return str(rawValue)
+        textParts = []
+        for itemValue in rawValue:
+            if isinstance(itemValue, dict):
+                textValue = itemValue.get("text", "")
+                if isinstance(textValue, str):
+                    textParts.append(textValue)
+        return " ".join(textParts)
+
+    def buildPromptFromMessages(rawMessages):
+        lines = []
+        for message in rawMessages:
+            if not isinstance(message, dict):
+                continue
+            roleValue = str(message.get("role", "user")).strip().lower()
+            contentText = normalizeMessageContent(message.get("content", "")).strip()
+            if contentText == "":
+                continue
+            lineValue = roleValue.upper() + ":\n" + contentText
+            lines.append(lineValue)
+        promptText = "\n\n".join(lines)
+        return promptText
+
+    def invokeModelSync(rawMessages, selectedModel, tokenLimit, selectedApiKey):
+        client = genai.Client(api_key=selectedApiKey)
+        promptText = buildPromptFromMessages(rawMessages)
+        response = client.models.generate_content(
+            model=selectedModel,
+            contents=promptText,
+            config={"max_output_tokens": tokenLimit},
+        )
+        responseText = getattr(response, "text", "")
+        if responseText is None:
+            responseText = ""
+        responseText = str(responseText)
+        return {"choices": [{"message": {"content": responseText}}]}
+
+    try:
+        responseJson = await asyncio.to_thread(invokeModelSync, messagesList, modelName, maxTokens, apiKey)
+        print(f"[RAG][{requestLabel}] Provider=Gemini Model={modelName}")
+        return responseJson
+    except Exception as geminiError:
+        print(f"[RAG][{requestLabel}] Gemini failed on model={modelName}. Trying Grok fallback.")
+        fallbackApiKey = resolveGrokApiKey()
+        if fallbackApiKey == "":
+            raise RuntimeError("Gemini request failed and GROK_API_KEY is missing for fallback.") from geminiError
+
+        fallbackHeaders = {
+            "Authorization": "Bearer " + fallbackApiKey,
+            "Content-Type": "application/json",
+        }
+        fallbackPayload = {
+            "model": GROK_BACKUP_MODEL,
+            "messages": messagesList,
+            "max_tokens": maxTokens,
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=120) as client:
+                fallbackResponse = await client.post(url=GROK_API_URL, headers=fallbackHeaders, json=fallbackPayload)
+            fallbackResponse.raise_for_status()
+            fallbackJson = fallbackResponse.json()
+            print(f"[RAG][{requestLabel}] Provider=GrokFallback Model={GROK_BACKUP_MODEL}")
+            return fallbackJson
+        except Exception as fallbackError:
+            raise RuntimeError(
+                "Gemini request failed and Grok fallback also failed: " + str(fallbackError)
+            ) from fallbackError
 
 
 def extractMessageDict(responseJson):
@@ -104,10 +182,32 @@ def normalizeContentValue(contentValue):
     return normalizedString
 
 
-def requestExpandedQuestion(questionText, modelName, apiKey):
-    messagesList = buildExpanderMessages(questionText)
+def extractRecentUserMessages(conversationTurns, maxMessages):
+    if not isinstance(conversationTurns, list):
+        return []
+    userMessages = []
+    index = 0
+    totalTurns = len(conversationTurns)
+    while index < totalTurns:
+        turnValue = conversationTurns[index]
+        isDictTurn = isinstance(turnValue, dict)
+        if isDictTurn:
+            roleValue = turnValue.get("role", "")
+            if roleValue == "user":
+                contentValue = turnValue.get("content", "")
+                contentText = str(contentValue).strip()
+                if contentText != "":
+                    userMessages.append(contentText)
+        index = index + 1
+    if len(userMessages) > maxMessages:
+        userMessages = userMessages[-maxMessages:]
+    return userMessages
+
+
+async def requestExpandedQuestion(questionText, modelName, apiKey, recentUserMessages=None):
+    messagesList = buildExpanderMessages(questionText, recentUserMessages)
     maxTokensValue = 150
-    responseJson = postChatCompletion(messagesList, modelName, maxTokensValue, apiKey)
+    responseJson = await postChatCompletion(messagesList, modelName, maxTokensValue, apiKey, requestLabel="expansion")
     messageDict = extractMessageDict(responseJson)
     contentValue = messageDict.get("content", "")
     normalizedContent = normalizeContentValue(contentValue)
@@ -115,13 +215,14 @@ def requestExpandedQuestion(questionText, modelName, apiKey):
     isExpandedEmpty = expandedQuestion == ""
     if isExpandedEmpty:
         expandedQuestion = questionText
+    print(f"[RAG][expansion] Response={expandedQuestion}")
     return expandedQuestion
 
 
-def requestHydePassage(expandedQuestion, modelName, apiKey):
-    messagesList = buildHydeMessages(expandedQuestion)
+async def requestHydePassage(expandedQuestion, modelName, apiKey, recentUserMessages=None):
+    messagesList = buildHydeMessages(expandedQuestion, recentUserMessages)
     maxTokensValue = 250
-    responseJson = postChatCompletion(messagesList, modelName, maxTokensValue, apiKey)
+    responseJson = await postChatCompletion(messagesList, modelName, maxTokensValue, apiKey, requestLabel="hyde")
     messageDict = extractMessageDict(responseJson)
     contentValue = messageDict.get("content", "")
     normalizedContent = normalizeContentValue(contentValue)
@@ -129,17 +230,18 @@ def requestHydePassage(expandedQuestion, modelName, apiKey):
     isHydeEmpty = hydePassage == ""
     if isHydeEmpty:
         hydePassage = expandedQuestion
+    print(f"[RAG][hyde] Response={hydePassage}")
     return hydePassage
 
 
-def requestAnswerMessage(questionText, formattedContext, modelName, maxTokens, apiKey):
-    messagesList = buildAnswerMessages(questionText, formattedContext)
-    responseJson = postChatCompletion(messagesList, modelName, maxTokens, apiKey)
+async def requestAnswerMessage(questionText, formattedContext, modelName, maxTokens, apiKey, conversationTurns=None):
+    messagesList = buildAnswerMessages(questionText, formattedContext, conversationTurns)
+    responseJson = await postChatCompletion(messagesList, modelName, maxTokens, apiKey, requestLabel="answer")
     messageDict = extractMessageDict(responseJson)
     return messageDict
 
 
-def requestSecondPass(questionText, firstMessageDict, modelName, maxTokens, apiKey):
+async def requestSecondPass(questionText, firstMessageDict, modelName, maxTokens, apiKey):
     userRoleValue = "user"
     assistantRoleValue = "assistant"
     firstUserMessage = {"role": userRoleValue, "content": questionText}
@@ -152,7 +254,7 @@ def requestSecondPass(questionText, firstMessageDict, modelName, maxTokens, apiK
         assistantMessage["reasoning_details"] = reasoningDetailsValue
     userMessageTwo = {"role": "user", "content": "Are you sure? Think carefully."}
     messagesList = [firstUserMessage, assistantMessage, userMessageTwo]
-    responseJson = postChatCompletion(messagesList, modelName, maxTokens, apiKey)
+    responseJson = await postChatCompletion(messagesList, modelName, maxTokens, apiKey, requestLabel="second-pass")
     messageDict = extractMessageDict(responseJson)
     contentValue = messageDict.get("content", "")
     normalizedContent = normalizeContentValue(contentValue)
@@ -160,9 +262,12 @@ def requestSecondPass(questionText, firstMessageDict, modelName, maxTokens, apiK
     return finalSecondPassAnswer
 
 
-def runRetrieval(questionText, modelName, topK, sourceFile, apiKey):
-    expandedQuestion = requestExpandedQuestion(questionText, modelName, apiKey) #raw query to expanded query(punctuation, synonyms, related terms)
-    hydePassage = requestHydePassage(expandedQuestion, modelName, apiKey)#expanded query to hyde passage (sample answer without context)
+async def runRetrieval(questionText, modelName, topK, sourceFile, apiKey, conversationTurns=None):
+    print(f"[RAG] Starting retrieval with requested model={modelName}")
+    recentUserMessages = extractRecentUserMessages(conversationTurns, maxMessages=2)
+    expandedQuestion = await requestExpandedQuestion(questionText, modelName, apiKey, recentUserMessages) #raw query to expanded query(punctuation, synonyms, related terms)
+    # sleep(3)
+    hydePassage = await requestHydePassage(expandedQuestion, modelName, apiKey, recentUserMessages)#expanded query to hyde passage (sample answer without context)
     collection = createCollection()
     retrievedChunks = retrieveChunks(collection, hydePassage, topK, sourceFile)#hyde passage to retrieved chunks from vector db
     formattedContext = formatChunksAsContext(retrievedChunks)#format retrieved chunks into context string for LLM answer generation
@@ -174,21 +279,21 @@ def runRetrieval(questionText, modelName, topK, sourceFile, apiKey):
     return resultDict
 
 
-def main():
+async def asyncMain():
     parser = buildArgumentParser()
     args = parser.parse_args()
 
     apiKey = resolveApiKey(args.api_key)
-    pipelineResult = runRetrieval(args.question, args.model, args.top_k, args.source, apiKey)
+    pipelineResult = await runRetrieval(args.question, args.model, args.top_k, args.source, apiKey)
     formattedContext = pipelineResult["context"]
 
-    firstMessageDict = requestAnswerMessage(args.question, formattedContext, args.model, args.max_tokens, apiKey)#generate answer based on retrieved context + raw question
+    firstMessageDict = await requestAnswerMessage(args.question, formattedContext, args.model, args.max_tokens, apiKey)#generate answer based on retrieved context + raw question
     firstAnswerRaw = firstMessageDict.get("content", "")
     firstAnswerNormalized = normalizeContentValue(firstAnswerRaw)
     finalAnswer = firstAnswerNormalized.strip()
 
     if args.double_check:
-        secondAnswer = requestSecondPass(args.question, firstMessageDict, args.model, args.max_tokens, apiKey)
+        secondAnswer = await requestSecondPass(args.question, firstMessageDict, args.model, args.max_tokens, apiKey)
         finalAnswer = secondAnswer
 
     print("Expanded Query:")
@@ -205,6 +310,10 @@ def main():
 
     print("Final Answer:")
     print(finalAnswer)
+
+
+def main():
+    asyncio.run(asyncMain())
 
 
 if __name__ == "__main__":
