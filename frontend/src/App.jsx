@@ -224,12 +224,22 @@ function App() {
                       Retrieval details
                     </summary>
                     <div className="mt-2 space-y-2 text-xs text-slate-700">
-                      <p>
-                        <strong>Expanded query:</strong> {message.expandedQuestion}
-                      </p>
-                      <p>
-                        <strong>HyDE passage:</strong> {message.hydePassage}
-                      </p>
+                      <div>
+                        <p>
+                          <strong>Expanded query:</strong>
+                        </p>
+                        <pre className="mt-1 max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
+                          {message.expandedQuestion}
+                        </pre>
+                      </div>
+                      <div>
+                        <p>
+                          <strong>HyDE passage:</strong>
+                        </p>
+                        <pre className="mt-1 max-h-52 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
+                          {message.hydePassage}
+                        </pre>
+                      </div>
                       {message.context && (
                         <p className="max-h-44 overflow-y-auto rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
                           {message.context}

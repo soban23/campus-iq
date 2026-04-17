@@ -22,6 +22,23 @@ GROK_API_URL = os.getenv("GROK_API_URL", "https://api.groq.com/openai/v1/chat/co
 GROK_BACKUP_MODEL = os.getenv("GROK_BACKUP_MODEL", "llama-3.3-70b-versatile")
 
 
+def readIntEnv(envName, defaultValue):
+    rawValue = os.getenv(envName)
+    if rawValue is None:
+        return defaultValue
+    try:
+        parsedValue = int(rawValue)
+        if parsedValue > 0:
+            return parsedValue
+    except ValueError:
+        pass
+    return defaultValue
+
+
+EXPANDED_QUERY_MAX_TOKENS = readIntEnv("EXPANDED_QUERY_MAX_TOKENS", 320)
+HYDE_MAX_TOKENS = readIntEnv("HYDE_MAX_TOKENS", 900)
+
+
 def buildArgumentParser():
     parser = argparse.ArgumentParser()
     parser.add_argument("question")
@@ -206,7 +223,7 @@ def extractRecentUserMessages(conversationTurns, maxMessages):
 
 async def requestExpandedQuestion(questionText, modelName, apiKey, recentUserMessages=None):
     messagesList = buildExpanderMessages(questionText, recentUserMessages)
-    maxTokensValue = 150
+    maxTokensValue = EXPANDED_QUERY_MAX_TOKENS
     responseJson = await postChatCompletion(messagesList, modelName, maxTokensValue, apiKey, requestLabel="expansion")
     messageDict = extractMessageDict(responseJson)
     contentValue = messageDict.get("content", "")
@@ -221,7 +238,7 @@ async def requestExpandedQuestion(questionText, modelName, apiKey, recentUserMes
 
 async def requestHydePassage(expandedQuestion, modelName, apiKey, recentUserMessages=None):
     messagesList = buildHydeMessages(expandedQuestion, recentUserMessages)
-    maxTokensValue = 250
+    maxTokensValue = HYDE_MAX_TOKENS
     responseJson = await postChatCompletion(messagesList, modelName, maxTokensValue, apiKey, requestLabel="hyde")
     messageDict = extractMessageDict(responseJson)
     contentValue = messageDict.get("content", "")
