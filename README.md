@@ -22,7 +22,7 @@ CampusIQ is a Retrieval-Augmented Generation (RAG) app for FAST-NUCES university
 ## 1) Clone And Enter Project
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/soban23/campus-iq
 cd campusiq-app
 ```
 
