@@ -115,7 +115,11 @@ async def rag_retrieve(payload: RetrievalRequest):
         )
         return responsePayload
     except RuntimeError as runtimeError:
-        raise HTTPException(status_code=400, detail=str(runtimeError)) from runtimeError
+        runtimeDetail = str(runtimeError)
+        loweredDetail = runtimeDetail.lower()
+        isTimeout = "timed out" in loweredDetail or "timeout" in loweredDetail
+        statusCode = 504 if isTimeout else 400
+        raise HTTPException(status_code=statusCode, detail=runtimeDetail) from runtimeError
     except HTTPError as requestError:
         raise HTTPException(status_code=502, detail=f"LLM request failed: {requestError}") from requestError
     except Exception as unknownError:

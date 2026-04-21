@@ -37,6 +37,8 @@ def readIntEnv(envName, defaultValue):
 
 EXPANDED_QUERY_MAX_TOKENS = readIntEnv("EXPANDED_QUERY_MAX_TOKENS", 320)
 HYDE_MAX_TOKENS = readIntEnv("HYDE_MAX_TOKENS", 900)
+GEMINI_TIMEOUT_SECONDS = readIntEnv("GEMINI_TIMEOUT_SECONDS", 45)
+GROK_TIMEOUT_SECONDS = readIntEnv("GROK_TIMEOUT_SECONDS", 45)
 
 
 def buildArgumentParser():
@@ -125,9 +127,16 @@ async def postChatCompletion(messagesList, modelName, maxTokens, apiKey, request
         return {"choices": [{"message": {"content": responseText}}]}
 
     try:
-        responseJson = await asyncio.to_thread(invokeModelSync, messagesList, modelName, maxTokens, apiKey)
+        print(f"[RAG][{requestLabel}] Sending Gemini request model={modelName} max_tokens={maxTokens}")
+        responseJson = await asyncio.wait_for(
+            asyncio.to_thread(invokeModelSync, messagesList, modelName, maxTokens, apiKey),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
         print(f"[RAG][{requestLabel}] Provider=Gemini Model={modelName}")
         return responseJson
+    except asyncio.TimeoutError as geminiTimeoutError:
+        print(f"[RAG][{requestLabel}] Gemini timeout after {GEMINI_TIMEOUT_SECONDS}s. Trying Grok fallback.")
+        geminiError = geminiTimeoutError
     except Exception as geminiError:
         print(f"[RAG][{requestLabel}] Gemini failed on model={modelName}. Trying Grok fallback.")
         fallbackApiKey = resolveGrokApiKey()
@@ -145,12 +154,17 @@ async def postChatCompletion(messagesList, modelName, maxTokens, apiKey, request
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120) as client:
+            print(f"[RAG][{requestLabel}] Sending Grok fallback request model={GROK_BACKUP_MODEL} max_tokens={maxTokens}")
+            async with httpx.AsyncClient(timeout=GROK_TIMEOUT_SECONDS) as client:
                 fallbackResponse = await client.post(url=GROK_API_URL, headers=fallbackHeaders, json=fallbackPayload)
             fallbackResponse.raise_for_status()
             fallbackJson = fallbackResponse.json()
             print(f"[RAG][{requestLabel}] Provider=GrokFallback Model={GROK_BACKUP_MODEL}")
             return fallbackJson
+        except httpx.TimeoutException as fallbackTimeoutError:
+            raise RuntimeError(
+                "Gemini request failed and Grok fallback timed out after " + str(GROK_TIMEOUT_SECONDS) + "s."
+            ) from fallbackTimeoutError
         except Exception as fallbackError:
             raise RuntimeError(
                 "Gemini request failed and Grok fallback also failed: " + str(fallbackError)
