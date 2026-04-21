@@ -38,7 +38,7 @@ graph TB
 
 The ingestion pipeline converts raw PDF documents into searchable vector embeddings stored in ChromaDB. It runs **offline** before the API server starts.
 
-### 1.1 PDF → Markdown Conversion — [pdf_to_md.py](file:///c:/Users/HP/Desktop/campusiq-app/ingestion/pdf_to_md.py)
+### 1.1 PDF → Markdown Conversion — [pdf_to_md.py](https://github.com/soban23/campus-iq/blob/master/ingestion/pdf_to_md.py)
 
 | Aspect | Detail |
 |--------|--------|
@@ -57,7 +57,7 @@ The ingestion pipeline converts raw PDF documents into searchable vector embeddi
 
 ---
 
-### 1.2 Header-Aware Markdown Chunking — [chunking.py](file:///c:/Users/HP/Desktop/campusiq-app/ingestion/chunking.py)
+### 1.2 Header-Aware Markdown Chunking — [chunking.py](https://github.com/soban23/campus-iq/blob/master/ingestion/chunking.py)
 
 This is a **custom, non-library chunking implementation** that is section-aware rather than using naive fixed-size splitting.
 
@@ -104,7 +104,7 @@ in their intermediate examination...
 
 ---
 
-### 1.3 Vector Storage — [storage.py](file:///c:/Users/HP/Desktop/campusiq-app/ingestion/storage.py)
+### 1.3 Vector Storage — [storage.py](https://github.com/soban23/campus-iq/blob/master/ingestion/storage.py)
 
 | Aspect | Detail |
 |--------|--------|
@@ -132,7 +132,7 @@ in their intermediate examination...
 
 ---
 
-### 1.4 Ingestion Entry Point — [run_ingest.py](file:///c:/Users/HP/Desktop/campusiq-app/ingestion/run_ingest.py)
+### 1.4 Ingestion Entry Point — [run_ingest.py](https://github.com/soban23/campus-iq/blob/master/ingestion/run_ingest.py)
 
 A simple CLI script that ties the pipeline together:
 ```
@@ -200,7 +200,7 @@ sequenceDiagram
 
 ---
 
-### 2.2 Stage 1: Query Expansion — [expander.py](file:///c:/Users/HP/Desktop/campusiq-app/retrieval/expander.py)
+### 2.2 Stage 1: Query Expansion — [expander.py](https://github.com/soban23/campus-iq/blob/master/retrieval/expander.py)
 
 **Approach:** LLM-based query rewriting
 
@@ -222,7 +222,7 @@ Output: "What is the tuition fee structure, semester fee, charges, payment
 
 ---
 
-### 2.3 Stage 2: HyDE (Hypothetical Document Embeddings) — [hyde.py](file:///c:/Users/HP/Desktop/campusiq-app/retrieval/hyde.py)
+### 2.3 Stage 2: HyDE (Hypothetical Document Embeddings) — [hyde.py](https://github.com/soban23/campus-iq/blob/master/retrieval/hyde.py)
 
 **Approach:** [HyDE](https://arxiv.org/abs/2212.10496) — a state-of-the-art retrieval technique
 
@@ -245,7 +245,7 @@ HyDE:   "Applicants for the MS program must hold a four-year bachelor's degree
 
 ---
 
-### 2.4 Stage 3: Vector Retrieval — [retriever.py](file:///c:/Users/HP/Desktop/campusiq-app/retrieval/retriever.py)
+### 2.4 Stage 3: Vector Retrieval — [retriever.py](https://github.com/soban23/campus-iq/blob/master/retrieval/retriever.py)
 
 | Aspect | Detail |
 |--------|--------|
@@ -264,7 +264,7 @@ HyDE:   "Applicants for the MS program must hold a four-year bachelor's degree
 
 ---
 
-### 2.5 Stage 4: Context Formatting — [pipeline.py](file:///c:/Users/HP/Desktop/campusiq-app/retrieval/pipeline.py)
+### 2.5 Stage 4: Context Formatting — [pipeline.py](https://github.com/soban23/campus-iq/blob/master/retrieval/pipeline.py)
 
 Formats the retrieved chunks into a single context string for the LLM, with each chunk annotated:
 
@@ -278,7 +278,7 @@ The semester fee for the BS program is...
 
 ---
 
-### 2.6 Stage 5: Answer Generation — [answer.py](file:///c:/Users/HP/Desktop/campusiq-app/retrieval/answer.py)
+### 2.6 Stage 5: Answer Generation — [answer.py](https://github.com/soban23/campus-iq/blob/master/retrieval/answer.py)
 
 **System prompt:** *"You are CampusIQ, a university assistant for FAST-NUCES. Answer the student question using only the provided context."*
 
@@ -295,7 +295,7 @@ The semester fee for the BS program is...
 
 ---
 
-### 2.7 Stage 6: Double-Check / Second Pass — [requestSecondPass()](file:///c:/Users/HP/Desktop/campusiq-app/run_retrieval.py#L261-L279)
+### 2.7 Stage 6: Double-Check / Second Pass — [requestSecondPass()](https://github.com/soban23/campus-iq/blob/master/run_retrieval.py#L261-L279)
 
 An **optional verification step** (enabled via `double_check: true`). After the first answer is generated, a follow-up message is sent:
 
@@ -309,7 +309,7 @@ This prompts the model to self-verify, potentially catching hallucinations or er
 
 ---
 
-## 3. API Layer — [main.py](file:///c:/Users/HP/Desktop/campusiq-app/main.py)
+## 3. API Layer — [main.py](https://github.com/soban23/campus-iq/blob/master/main.py)
 
 | Aspect | Detail |
 |--------|--------|
@@ -343,7 +343,7 @@ This prompts the model to self-verify, potentially catching hallucinations or er
 
 ---
 
-## 4. LLM Provider Strategy — [postChatCompletion()](file:///c:/Users/HP/Desktop/campusiq-app/run_retrieval.py#L83-L157)
+## 4. LLM Provider Strategy — [postChatCompletion()](https://github.com/soban23/campus-iq/blob/master/run_retrieval.py#L83-L157)
 
 The system uses a **primary + fallback** LLM strategy:
 

@@ -1,4 +1,4 @@
-# CampusIQ App
+# [CampusIQ App](https://github.com/soban23/campus-iq/blob/master/summary.md)
 
 CampusIQ is a Retrieval-Augmented Generation (RAG) app for FAST-NUCES university Q&A.
 
