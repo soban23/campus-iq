@@ -47,7 +47,7 @@ def buildArgumentParser():
     parser.add_argument("--source", default=None)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--max-tokens", type=int, default=500)
+    parser.add_argument("--max-tokens", type=int, default=1000)
     parser.add_argument("--api-key", default=None)
     parser.add_argument("--double-check", action="store_true")
     parser.add_argument("--show-context", action="store_true")
@@ -269,6 +269,7 @@ async def requestAnswerMessage(questionText, formattedContext, modelName, maxTok
     messagesList = buildAnswerMessages(questionText, formattedContext, conversationTurns)
     responseJson = await postChatCompletion(messagesList, modelName, maxTokens, apiKey, requestLabel="answer")
     messageDict = extractMessageDict(responseJson)
+    print(f"[RAG][answer] Response={messageDict}")
     return messageDict
 
 

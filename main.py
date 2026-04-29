@@ -23,7 +23,7 @@ class RetrievalRequest(BaseModel):
     source: str | None = None
     top_k: int = Field(default=5, ge=1)
     model: str = DEFAULT_MODEL
-    max_tokens: int = Field(default=500, ge=1)
+    max_tokens: int = Field(default=1000, ge=1)
     api_key: str = os.getenv("GOOGLE_GENERATIVE_AI_API_KEY", "")
     double_check: bool = False
     show_context: bool = False

@@ -3,6 +3,6 @@ from ingestion.storage import storeChunksInChroma
 
 
 if __name__ == "__main__":
-    inputFile = r"filePath.md"
+    inputFile = r"<input_file.md>"
     chunks = chunkMarkdownFile(inputFile)
     storeChunksInChroma(chunks, inputFile)

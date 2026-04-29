@@ -5,6 +5,7 @@
 .env
 cleanup.py
 quarantine_collections/
+prospectus_md_files/
 
 # Python cache
 __pycache__/
