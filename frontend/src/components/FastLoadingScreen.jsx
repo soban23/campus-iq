@@ -1,43 +1,99 @@
 function FastLoadingScreen() {
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#F4F6F8] text-slate-900">
+    <div className="crt-scanlines noise-bg crt-flicker relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0a0a0a]">
+      {/* Vignette overlay */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'linear-gradient(135deg, rgba(0,93,170,0.18) 0%, rgba(244,246,248,0.9) 40%, rgba(247,194,0,0.22) 100%)',
+            'radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.7) 100%)',
         }}
       />
-      <div
-        className="pointer-events-none absolute inset-0 opacity-[0.09]"
-        style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, #005DAA 1px, transparent 0)',
-          backgroundSize: '26px 26px',
-        }}
-      />
-      <div className="pointer-events-none absolute -left-16 top-6 h-80 w-80 rounded-full bg-[#005DAA]/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-0 h-80 w-80 rounded-full bg-[#F7C200]/22 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-8 right-12 h-56 w-56 rounded-full bg-[#2E8B3A]/18 blur-3xl" />
 
-      <div className="relative z-10 flex flex-col items-center gap-5 px-6 text-center">
-        <div className="relative">
-          <div className="absolute inset-0 rounded-3xl bg-[#005DAA]/20 blur-xl animate-pulse" />
-          <div className="relative grid h-24 w-24 place-items-center overflow-hidden rounded-3xl border border-[#005DAA]/25 bg-white shadow-lg">
-            <img src="/download-removebg-preview.png" alt="FAST logo" className="h-20 w-20 object-contain" />
+      {/* Subtle grid pattern */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.04]"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '24px 24px',
+        }}
+      />
+
+      <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
+        {/* ASCII art logo frame */}
+        <div className="font-mono-ui text-[10px] leading-tight tracking-wider text-[#555] select-none">
+          <pre className="inline-block text-left">
+{`┌──────────────────────┐
+│                      │
+│    ╔═╗╔═╗╔╦╗╔═╗      │
+│    ║  ╠═╣║║║╠═╝      │
+│    ╚═╝╩ ╩╩ ╩╩        │
+│     ╦╔═╗             │
+│     ║║═╬╗            │
+│     ╩╚═╝╚            │
+│                      │
+└──────────────────────┘`}
+          </pre>
+        </div>
+
+        {/* Title */}
+        <div>
+          <h1 className="font-display text-2xl font-bold tracking-[0.15em] text-[#e8e8e8] retro-glow uppercase">
+            CampusIQ
+          </h1>
+          <p className="font-mono-ui mt-2 text-[11px] tracking-[0.3em] text-[#555] uppercase">
+            Knowledge Retrieval System
+          </p>
+        </div>
+
+        {/* Boot sequence text */}
+        <div className="font-mono-ui space-y-1 text-[11px] text-[#666]">
+          <p style={{ animation: 'boot-text-appear 0.3s ease-out forwards', animationDelay: '0.2s', opacity: 0 }}>
+            {'> '}Initializing system...
+          </p>
+          <p style={{ animation: 'boot-text-appear 0.3s ease-out forwards', animationDelay: '0.6s', opacity: 0 }}>
+            {'> '}Loading knowledge base...
+          </p>
+          <p style={{ animation: 'boot-text-appear 0.3s ease-out forwards', animationDelay: '1.0s', opacity: 0 }}>
+            {'> '}Connecting to RAG engine...
+          </p>
+          <p
+            className="text-[#e8e8e8]"
+            style={{ animation: 'boot-text-appear 0.3s ease-out forwards', animationDelay: '1.5s', opacity: 0 }}
+          >
+            {'> '}System ready.<span className="retro-cursor" />
+          </p>
+        </div>
+
+        {/* Loading bar */}
+        <div className="mt-2 w-48">
+          <div className="h-[2px] w-full bg-[#222] overflow-hidden">
+            <div
+              className="h-full bg-[#e8e8e8]"
+              style={{
+                animation: 'boot-load-bar 2s ease-in-out forwards',
+              }}
+            />
           </div>
         </div>
 
-        <div>
-          <p className="font-display text-lg font-semibold text-[#005DAA]">CampusIQ</p>
-          {/* <p className="mt-1 text-xs text-slate-500">LOADING</p> */}
-        </div>
-
-        <div className="flex items-center gap-2" aria-label="Loading indicator">
-          <span className="h-2.5 w-2.5 rounded-full bg-[#005DAA] animate-bounce" />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#F7C200] animate-bounce" style={{ animationDelay: '0.12s' }} />
-          <span className="h-2.5 w-2.5 rounded-full bg-[#2E8B3A] animate-bounce" style={{ animationDelay: '0.24s' }} />
+        {/* Loading dots */}
+        <div className="flex items-center gap-3 mt-1" aria-label="Loading indicator">
+          <span className="retro-dot" />
+          <span className="retro-dot" />
+          <span className="retro-dot" />
         </div>
       </div>
+
+      <style>{`
+        @keyframes boot-load-bar {
+          0% { width: 0%; }
+          30% { width: 40%; }
+          60% { width: 70%; }
+          100% { width: 100%; }
+        }
+      `}</style>
     </div>
   )
 }

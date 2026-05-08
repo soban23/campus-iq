@@ -8,18 +8,24 @@ const markdownComponents = {
   ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
   ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
   li: ({ children }) => <li className="mb-1">{children}</li>,
-  strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+  strong: ({ children }) => <strong className="font-semibold text-white">{children}</strong>,
   code: ({ children }) => (
-    <code className="rounded bg-[#F4F6F8] px-1 py-0.5 font-mono-ui text-[12px] text-[#005DAA]">{children}</code>
+    <code className="rounded-none border border-[#333] bg-[#111] px-1.5 py-0.5 font-mono-ui text-[12px] text-[#ccc]">
+      {children}
+    </code>
   ),
   table: ({ children }) => (
-    <div className="my-2 overflow-x-auto rounded-lg border border-[#DCE3E8] bg-white">
+    <div className="my-2 overflow-x-auto border border-[#333] bg-[#0a0a0a]">
       <table className="min-w-full border-collapse text-xs">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="bg-[#F4F6F8]">{children}</thead>,
-  th: ({ children }) => <th className="border border-[#DCE3E8] px-2 py-1 text-left font-semibold text-[#005DAA]">{children}</th>,
-  td: ({ children }) => <td className="border border-[#DCE3E8] px-2 py-1 align-top">{children}</td>,
+  thead: ({ children }) => <thead className="bg-[#1a1a1a]">{children}</thead>,
+  th: ({ children }) => (
+    <th className="border border-[#333] px-2 py-1 text-left font-semibold text-[#e8e8e8] uppercase tracking-wider text-[10px]">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => <td className="border border-[#333] px-2 py-1 align-top text-[#aaa]">{children}</td>,
 }
 
 function sanitizeErrorText(rawText) {
@@ -62,7 +68,7 @@ function App() {
       id: 'welcome',
       role: 'assistant',
       content:
-        'Welcome to CampusIQ. Ask me anything about university policies, rules, or handbook details, and I will answer using the retrieval API.',
+        'Welcome to **CampusIQ**. Ask me anything about university policies, rules, or handbook details — I will answer using the retrieval API.',
     },
   ])
   const [question, setQuestion] = useState('')
@@ -162,54 +168,105 @@ function App() {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F4F6F8] text-slate-900">
+    <div className="crt-scanlines noise-bg crt-flicker relative min-h-screen overflow-hidden bg-[#0a0a0a] text-[#e8e8e8]">
+      {/* Vignette */}
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            'linear-gradient(135deg, rgba(0,93,170,0.16) 0%, rgba(244,246,248,0.92) 42%, rgba(247,194,0,0.22) 100%)',
+          background: 'radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.6) 100%)',
         }}
       />
+
+      {/* Subtle grid */}
       <div
-        className="pointer-events-none absolute inset-0 opacity-[0.07]"
+        className="pointer-events-none absolute inset-0 opacity-[0.03]"
         style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, #005DAA 1px, transparent 0)',
-          backgroundSize: '28px 28px',
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '20px 20px',
         }}
       />
-      <div className="pointer-events-none absolute -left-24 top-8 h-72 w-72 rounded-full bg-[#005DAA]/14 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-0 h-80 w-80 rounded-full bg-[#F7C200]/18 blur-3xl" />
-      <div className="pointer-events-none absolute bottom-12 right-10 h-56 w-56 rounded-full bg-[#2E8B3A]/14 blur-3xl" />
 
-      <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-3 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4">
-        <main className="relative flex min-h-screen flex-1 flex-col">
-          <div className="mb-4 flex items-center justify-between rounded-2xl border border-[#DCE3E8] bg-white p-3 shadow-sm">
-            <div>
-              <h2 className="font-display text-lg font-semibold text-[#005DAA]">Chat</h2>
-              <p className="text-xs text-slate-500">Ask questions and get retrieval-grounded answers.</p>
+      {/* Corner decorations */}
+      <div className="pointer-events-none absolute left-4 top-4 text-[10px] text-[#333] font-mono-ui select-none">
+        ┌─────
+      </div>
+      <div className="pointer-events-none absolute right-4 top-4 text-[10px] text-[#333] font-mono-ui select-none">
+        ─────┐
+      </div>
+      <div className="pointer-events-none absolute left-4 bottom-4 text-[10px] text-[#333] font-mono-ui select-none">
+        └─────
+      </div>
+      <div className="pointer-events-none absolute right-4 bottom-4 text-[10px] text-[#333] font-mono-ui select-none">
+        ─────┘
+      </div>
+
+      <div className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-4 pb-4 pt-4 sm:px-8 sm:pb-6 sm:pt-6">
+        <main className="relative flex min-h-screen flex-1 flex-col gap-4">
+          {/* Header */}
+          <header className="flex items-center justify-between border border-[#333] bg-[#111] p-4">
+            <div className="flex items-center gap-4">
+              {/* Terminal icon */}
+              <div className="font-mono-ui text-[18px] text-[#555] leading-none select-none">
+                {'>'}_
+              </div>
+              <div>
+                <h1 className="font-display text-lg font-bold tracking-[0.12em] text-[#e8e8e8] uppercase retro-glow">
+                  CampusIQ
+                </h1>
+                <p className="font-mono-ui text-[10px] tracking-[0.2em] text-[#555] uppercase mt-0.5">
+                  Retrieval-Augmented Chat Terminal
+                </p>
+              </div>
             </div>
-            <span className="rounded-full border border-[#2E8B3A]/30 bg-[#2E8B3A]/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-[#2E8B3A]">
-              Live
-            </span>
-          </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono-ui text-[10px] tracking-wider text-[#555] uppercase hidden sm:inline">
+                SYS:OK
+              </span>
+              <span className="flex items-center gap-1.5 border border-[#333] bg-[#0a0a0a] px-3 py-1">
+                <span className="h-1.5 w-1.5 bg-[#e8e8e8] thinking-dot" />
+                <span className="font-mono-ui text-[10px] font-semibold uppercase tracking-[0.15em] text-[#888]">
+                  Live
+                </span>
+              </span>
+            </div>
+          </header>
 
-          <section className="flex-1 space-y-3 overflow-y-auto rounded-2xl border border-[#DCE3E8] bg-[#F4F6F8] p-3 shadow-inner sm:p-5">
+          {/* Messages area */}
+          <section className="flex-1 space-y-3 overflow-y-auto border border-[#333] bg-[#0d0d0d] p-4 sm:p-5">
+            {/* Decorative header inside message area */}
+            <div className="font-mono-ui text-[9px] text-[#333] tracking-widest uppercase select-none border-b border-[#1a1a1a] pb-2 mb-3">
+              ══════ conversation log ══════
+            </div>
+
             {messages.map((message) => (
               <article
                 key={message.id}
-                className={`max-w-3xl rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+                className={`max-w-3xl px-4 py-3 text-sm transition-all duration-200 ${
                   message.role === 'user'
-                    ? 'ml-auto border-[#005DAA] bg-[#005DAA] text-white'
+                    ? 'ml-auto border border-[#e8e8e8] bg-[#e8e8e8] text-[#0a0a0a]'
                     : message.role === 'error'
-                      ? 'mr-auto border-[#F7C200] bg-[#FFF9E6] text-slate-900'
-                      : 'mr-auto border-[#DCE3E8] bg-white text-slate-800'
+                      ? 'mr-auto border border-[#555] bg-[#1a1a1a] text-[#aaa]'
+                      : 'mr-auto border border-[#282828] bg-[#111] text-[#ccc]'
                 }`}
               >
-                <header className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#005DAA]">
-                  {message.role === 'user' ? 'You' : message.role === 'error' ? 'Error' : 'CampusIQ'}
+                <header
+                  className={`mb-2 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.2em] ${
+                    message.role === 'user'
+                      ? 'text-[#555]'
+                      : message.role === 'error'
+                        ? 'text-[#888]'
+                        : 'text-[#666]'
+                  }`}
+                >
+                  {message.role === 'user'
+                    ? '▶ You'
+                    : message.role === 'error'
+                      ? '✕ Error'
+                      : '◆ CampusIQ'}
                 </header>
                 {message.role === 'assistant' ? (
-                  <div className="text-sm text-slate-800">
+                  <div className="text-sm text-[#ccc] leading-relaxed">
                     <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                       {message.content}
                     </ReactMarkdown>
@@ -219,44 +276,60 @@ function App() {
                 )}
 
                 {message.role === 'assistant' && message.expandedQuestion && (
-                  <details className="mt-3 rounded-lg border border-[#F7C200] bg-[#FFF9E6] p-2">
-                    <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[#005DAA]">
-                      Retrieval details
+                  <details className="mt-3 border border-[#282828] bg-[#0d0d0d] p-3">
+                    <summary className="cursor-pointer font-mono-ui text-[10px] font-semibold uppercase tracking-[0.15em] text-[#666] hover:text-[#999] transition-colors">
+                      ▸ Retrieval Details
                     </summary>
-                    <div className="mt-2 space-y-2 text-xs text-slate-700">
+                    <div className="mt-3 space-y-3 text-xs text-[#888]">
                       <div>
-                        <p>
-                          <strong>Expanded query:</strong>
+                        <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
+                          Expanded Query:
                         </p>
-                        <pre className="mt-1 max-h-44 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
+                        <pre className="max-h-44 overflow-y-auto whitespace-pre-wrap break-words border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
                           {message.expandedQuestion}
                         </pre>
                       </div>
                       <div>
-                        <p>
-                          <strong>HyDE passage:</strong>
+                        <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
+                          HyDE Passage:
                         </p>
-                        <pre className="mt-1 max-h-52 overflow-y-auto whitespace-pre-wrap break-words rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
+                        <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-words border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
                           {message.hydePassage}
                         </pre>
                       </div>
                       {message.context && (
-                        <p className="max-h-44 overflow-y-auto rounded-md border border-[#DCE3E8] bg-white p-2 font-mono-ui text-[11px]">
-                          {message.context}
-                        </p>
+                        <div>
+                          <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
+                            Context:
+                          </p>
+                          <p className="max-h-44 overflow-y-auto border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
+                            {message.context}
+                          </p>
+                        </div>
                       )}
                       {Array.isArray(message.chunks) && message.chunks.length > 0 && (
-                        <ul className="space-y-1">
-                          {message.chunks.slice(0, 5).map((chunk, index) => {
-                            const breadcrumb = chunk?.metadata?.breadcrumb ?? chunk?.metadata?.source ?? 'unknown'
-                            const score = Number.isFinite(chunk?.score) ? chunk.score.toFixed(3) : 'n/a'
-                            return (
-                              <li key={`${message.id}-${index}`} className="rounded-md border border-[#DCE3E8] bg-white px-2 py-1">
-                                {index + 1}. {breadcrumb} | score {score}
-                              </li>
-                            )
-                          })}
-                        </ul>
+                        <div>
+                          <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
+                            Retrieved Chunks:
+                          </p>
+                          <ul className="space-y-1">
+                            {message.chunks.slice(0, 5).map((chunk, index) => {
+                              const breadcrumb =
+                                chunk?.metadata?.breadcrumb ?? chunk?.metadata?.source ?? 'unknown'
+                              const score = Number.isFinite(chunk?.score) ? chunk.score.toFixed(3) : 'n/a'
+                              return (
+                                <li
+                                  key={`${message.id}-${index}`}
+                                  className="border border-[#222] bg-[#0a0a0a] px-2 py-1 font-mono-ui text-[11px] text-[#666]"
+                                >
+                                  <span className="text-[#888]">{index + 1}.</span> {breadcrumb}{' '}
+                                  <span className="text-[#444]">│</span> score{' '}
+                                  <span className="text-[#999]">{score}</span>
+                                </li>
+                              )
+                            })}
+                          </ul>
+                        </div>
                       )}
                     </div>
                   </details>
@@ -265,19 +338,29 @@ function App() {
             ))}
 
             {isSending && (
-              <div className="mr-auto inline-flex items-center gap-2 rounded-xl border border-[#2E8B3A]/40 bg-white px-4 py-2 text-sm text-[#2E8B3A]">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-[#2E8B3A]" />
-                CampusIQ is thinking...
+              <div className="mr-auto inline-flex items-center gap-3 border border-[#282828] bg-[#111] px-4 py-3 text-sm text-[#888]">
+                <span className="flex gap-1.5">
+                  <span className="retro-dot" style={{ width: 6, height: 6 }} />
+                  <span className="retro-dot" style={{ width: 6, height: 6 }} />
+                  <span className="retro-dot" style={{ width: 6, height: 6 }} />
+                </span>
+                <span className="font-mono-ui text-[11px] tracking-wider uppercase">
+                  Processing query...
+                </span>
               </div>
             )}
             <div ref={messageEndRef} />
           </section>
 
-          <form onSubmit={sendQuestion} className="mt-4 rounded-2xl border border-[#DCE3E8] bg-white p-3 shadow-lg sm:p-4">
-            <label htmlFor="prompt" className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#005DAA]">
-              Your question
+          {/* Input form */}
+          <form onSubmit={sendQuestion} className="border border-[#333] bg-[#111] p-4">
+            <label
+              htmlFor="prompt"
+              className="mb-3 flex items-center gap-2 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.2em] text-[#555]"
+            >
+              <span className="text-[#888]">{'>'}</span> Enter your query
             </label>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <textarea
                 id="prompt"
                 value={question}
@@ -285,18 +368,27 @@ function App() {
                 onKeyDown={handlePromptKeyDown}
                 rows={3}
                 placeholder="Example: What is the policy for course withdrawal after midterm?"
-                className="min-h-20 flex-1 resize-none rounded-xl border border-[#DCE3E8] bg-white px-3 py-2 text-sm outline-none ring-[#F7C200] transition focus:ring"
+                className="retro-input min-h-20 flex-1 resize-none px-3 py-2 text-sm"
               />
               <button
                 type="submit"
                 disabled={isSending || question.trim() === ''}
-                className="rounded-xl bg-[#005DAA] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#004C8A] disabled:cursor-not-allowed disabled:opacity-50 sm:self-end"
+                className="retro-btn px-6 py-3 text-[12px] sm:self-end"
               >
-                Send
+                SEND ▸
               </button>
             </div>
-            {error && <p className="mt-2 text-sm text-[#8B2E2E]">{error}</p>}
+            {error && (
+              <p className="mt-2 font-mono-ui text-[12px] text-[#888] flex items-center gap-2">
+                <span className="text-[#666]">✕</span> {error}
+              </p>
+            )}
           </form>
+
+          {/* Footer */}
+          <footer className="font-mono-ui text-[9px] text-[#333] tracking-widest text-center select-none uppercase">
+            ─── CampusIQ v1.0 • Knowledge Retrieval System ───
+          </footer>
         </main>
       </div>
     </div>

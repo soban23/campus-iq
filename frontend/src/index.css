@@ -1,9 +1,22 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=Space+Mono:wght@400;700&family=Special+Elite&display=swap');
 @import 'tailwindcss';
 
+/* ─── RETRO DESIGN TOKENS ─── */
 :root {
-  color: #0f172a;
-  background: #f4f6f8;
+  --retro-black: #0a0a0a;
+  --retro-dark: #111111;
+  --retro-mid: #1a1a1a;
+  --retro-border: #333333;
+  --retro-muted: #555555;
+  --retro-silver: #888888;
+  --retro-light: #cccccc;
+  --retro-white: #e8e8e8;
+  --retro-pure: #ffffff;
+  --retro-glow: rgba(255, 255, 255, 0.08);
+  --retro-glow-strong: rgba(255, 255, 255, 0.15);
+
+  color: var(--retro-white);
+  background: var(--retro-black);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -17,31 +30,247 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-family: 'IBM Plex Mono', 'Courier New', monospace;
+  background: var(--retro-black);
+  color: var(--retro-white);
 }
 
 #root {
   min-height: 100vh;
 }
 
+/* ─── FONT UTILITIES ─── */
 .font-display {
-  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  font-family: 'Space Mono', 'IBM Plex Mono', monospace;
+  letter-spacing: 0.04em;
 }
 
 .font-mono-ui {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
 
+.font-typewriter {
+  font-family: 'Special Elite', 'Courier New', monospace;
+}
+
+/* ─── CRT SCANLINE OVERLAY ─── */
+.crt-scanlines::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.08) 2px,
+    rgba(0, 0, 0, 0.08) 4px
+  );
+}
+
+/* ─── NOISE TEXTURE ─── */
+.noise-bg::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* ─── CRT FLICKER ─── */
+@keyframes crt-flicker {
+  0%, 100% { opacity: 1; }
+  3% { opacity: 0.97; }
+  6% { opacity: 1; }
+  9% { opacity: 0.98; }
+  42% { opacity: 1; }
+  44% { opacity: 0.96; }
+  46% { opacity: 1; }
+  80% { opacity: 1; }
+  82% { opacity: 0.97; }
+}
+
+.crt-flicker {
+  animation: crt-flicker 5s infinite;
+}
+
+/* ─── TYPEWRITER CURSOR BLINK ─── */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.retro-cursor::after {
+  content: '█';
+  animation: cursor-blink 1s step-end infinite;
+  color: var(--retro-white);
+  margin-left: 2px;
+}
+
+/* ─── GLITCH TEXT ─── */
+@keyframes retro-glow-pulse {
+  0%, 100% {
+    text-shadow: 0 0 4px rgba(255,255,255,0.15), 0 0 8px rgba(255,255,255,0.05);
+  }
+  50% {
+    text-shadow: 0 0 8px rgba(255,255,255,0.25), 0 0 16px rgba(255,255,255,0.08);
+  }
+}
+
+.retro-glow {
+  animation: retro-glow-pulse 3s ease-in-out infinite;
+}
+
+/* ─── RETRO BORDER STYLE ─── */
+.retro-border {
+  border: 1px solid var(--retro-border);
+  box-shadow:
+    inset 0 0 0 1px var(--retro-dark),
+    0 0 0 1px rgba(255,255,255,0.03);
+}
+
+/* ─── RETRO BUTTON ─── */
+.retro-btn {
+  background: var(--retro-white);
+  color: var(--retro-black);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 2px solid var(--retro-white);
+  transition: all 0.15s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.retro-btn:hover:not(:disabled) {
+  background: transparent;
+  color: var(--retro-white);
+  box-shadow: 0 0 12px rgba(255,255,255,0.15);
+}
+
+.retro-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.retro-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ─── RETRO INPUT ─── */
+.retro-input {
+  background: var(--retro-dark);
+  color: var(--retro-white);
+  border: 1px solid var(--retro-border);
+  font-family: 'IBM Plex Mono', monospace;
+  caret-color: var(--retro-white);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.retro-input::placeholder {
+  color: var(--retro-muted);
+  font-style: italic;
+}
+
+.retro-input:focus {
+  outline: none;
+  border-color: var(--retro-silver);
+  box-shadow: 0 0 0 1px var(--retro-muted), 0 0 12px rgba(255,255,255,0.05);
+}
+
+/* ─── LOADING DOTS ─── */
+@keyframes retro-bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-8px); }
+}
+
+.retro-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: var(--retro-white);
+  border-radius: 0;
+  animation: retro-bounce 1.2s ease-in-out infinite;
+}
+
+.retro-dot:nth-child(2) { animation-delay: 0.15s; }
+.retro-dot:nth-child(3) { animation-delay: 0.3s; }
+
+/* ─── BOOT SCREEN ANIMATIONS ─── */
+@keyframes boot-text-appear {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes static-noise {
+  0% { background-position: 0 0; }
+  10% { background-position: -5% -10%; }
+  20% { background-position: -15% 5%; }
+  30% { background-position: 7% -25%; }
+  40% { background-position: -5% 25%; }
+  50% { background-position: -15% 10%; }
+  60% { background-position: 15% 0; }
+  70% { background-position: 0 15%; }
+  80% { background-position: 3% 35%; }
+  90% { background-position: -10% 10%; }
+  100% { background-position: 0 0; }
+}
+
+/* ─── SCROLLBAR ─── */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 93, 170, 0.35);
-  border-radius: 999px;
+  background: var(--retro-border);
+  border: 1px solid var(--retro-dark);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--retro-muted);
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(244, 246, 248, 0.8);
+  background: var(--retro-dark);
+}
+
+/* ─── DETAILS/SUMMARY ─── */
+details summary {
+  cursor: pointer;
+  user-select: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details summary::before {
+  content: '▸ ';
+  font-family: monospace;
+}
+
+details[open] summary::before {
+  content: '▾ ';
+}
+
+/* ─── SELECTION ─── */
+::selection {
+  background: var(--retro-white);
+  color: var(--retro-black);
+}
+
+/* ─── THINKING INDICATOR ─── */
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.thinking-dot {
+  animation: thinking-pulse 1.5s ease-in-out infinite;
 }
