@@ -24,16 +24,16 @@ function FastLoadingScreen() {
         {/* ASCII art logo frame */}
         <div className="font-mono-ui text-[10px] leading-tight tracking-wider text-[#555] select-none">
           <pre className="inline-block text-left">
-{`┌──────────────────────┐
-│                      │
-│    ╔═╗╔═╗╔╦╗╔═╗      │
-│    ║  ╠═╣║║║╠═╝      │
-│    ╚═╝╩ ╩╩ ╩╩        │
-│     ╦╔═╗             │
-│     ║║═╬╗            │
-│     ╩╚═╝╚            │
-│                      │
-└──────────────────────┘`}
+{`┌────────────────────────┐
+│                        │
+│   ╔═╗╔═╗╔╦╗╔═╗╦ ╦╔═╗   │
+│   ║  ╠═╣║║║╠═╝║ ║╚═╗   │
+│   ╚═╝╩ ╩╩ ╩╩  ╚═╝╚═╝   │
+│         ╦╔═╗           │
+│         ║║═╬╗          │
+│         ╩╚═╝╚          │
+│                        │
+└────────────────────────┘`}
           </pre>
         </div>
 
