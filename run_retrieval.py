@@ -126,23 +126,9 @@ async def postChatCompletion(messagesList, modelName, maxTokens, apiKey, request
         responseText = str(responseText)
         return {"choices": [{"message": {"content": responseText}}]}
 
-    try:
-        print(f"[RAG][{requestLabel}] Sending Gemini request model={modelName} max_tokens={maxTokens}")
-        responseJson = await asyncio.wait_for(
-            asyncio.to_thread(invokeModelSync, messagesList, modelName, maxTokens, apiKey),
-            timeout=GEMINI_TIMEOUT_SECONDS,
-        )
-        print(f"[RAG][{requestLabel}] Provider=Gemini Model={modelName}")
-        return responseJson
-    except asyncio.TimeoutError as geminiTimeoutError:
-        print(f"[RAG][{requestLabel}] Gemini timeout after {GEMINI_TIMEOUT_SECONDS}s. Trying Grok fallback.")
-        geminiError = geminiTimeoutError
-    except Exception as geminiError:
-        print(f"[RAG][{requestLabel}] Gemini failed on model={modelName}. Trying Grok fallback.")
-        fallbackApiKey = resolveGrokApiKey()
-        if fallbackApiKey == "":
-            raise RuntimeError("Gemini request failed and GROK_API_KEY is missing for fallback.") from geminiError
-
+    grokFailureReason = None
+    fallbackApiKey = resolveGrokApiKey()
+    if fallbackApiKey != "":
         fallbackHeaders = {
             "Authorization": "Bearer " + fallbackApiKey,
             "Content-Type": "application/json",
@@ -154,21 +140,38 @@ async def postChatCompletion(messagesList, modelName, maxTokens, apiKey, request
         }
 
         try:
-            print(f"[RAG][{requestLabel}] Sending Grok fallback request model={GROK_BACKUP_MODEL} max_tokens={maxTokens}")
+            print(f"[RAG][{requestLabel}] Sending Grok request model={GROK_BACKUP_MODEL} max_tokens={maxTokens}")
             async with httpx.AsyncClient(timeout=GROK_TIMEOUT_SECONDS) as client:
                 fallbackResponse = await client.post(url=GROK_API_URL, headers=fallbackHeaders, json=fallbackPayload)
             fallbackResponse.raise_for_status()
             fallbackJson = fallbackResponse.json()
-            print(f"[RAG][{requestLabel}] Provider=GrokFallback Model={GROK_BACKUP_MODEL}")
+            print(f"[RAG][{requestLabel}] Provider=GrokPrimary Model={GROK_BACKUP_MODEL}")
             return fallbackJson
         except httpx.TimeoutException as fallbackTimeoutError:
-            raise RuntimeError(
-                "Gemini request failed and Grok fallback timed out after " + str(GROK_TIMEOUT_SECONDS) + "s."
-            ) from fallbackTimeoutError
+            grokFailureReason = "Grok timed out after " + str(GROK_TIMEOUT_SECONDS) + "s."
+            print(f"[RAG][{requestLabel}] {grokFailureReason} Trying Gemini fallback.")
         except Exception as fallbackError:
-            raise RuntimeError(
-                "Gemini request failed and Grok fallback also failed: " + str(fallbackError)
-            ) from fallbackError
+            grokFailureReason = "Grok failed: " + str(fallbackError)
+            print(f"[RAG][{requestLabel}] {grokFailureReason} Trying Gemini fallback.")
+    else:
+        grokFailureReason = "GROK_API_KEY is missing."
+
+    try:
+        print(f"[RAG][{requestLabel}] Sending Gemini request model={modelName} max_tokens={maxTokens}")
+        responseJson = await asyncio.wait_for(
+            asyncio.to_thread(invokeModelSync, messagesList, modelName, maxTokens, apiKey),
+            timeout=GEMINI_TIMEOUT_SECONDS,
+        )
+        print(f"[RAG][{requestLabel}] Provider=Gemini Model={modelName}")
+        return responseJson
+    except asyncio.TimeoutError as geminiTimeoutError:
+        raise RuntimeError(
+            "Grok request failed and Gemini timed out after " + str(GEMINI_TIMEOUT_SECONDS) + "s."
+        ) from geminiTimeoutError
+    except Exception as geminiError:
+        raise RuntimeError(
+            "Grok request failed and Gemini fallback also failed: " + str(geminiError)
+        ) from geminiError
 
 
 def extractMessageDict(responseJson):

@@ -68,7 +68,7 @@ function App() {
       id: 'welcome',
       role: 'assistant',
       content:
-        'Welcome to **CampusIQ**. Ask me anything about university policies, rules, or handbook details — I will answer using the retrieval API.',
+        'Welcome to **CampusIQ**. Ask me anything about FAST university policies, rules, or handbook details — I will answer.',
     },
   ])
   const [question, setQuestion] = useState('')
