@@ -1,11 +1,16 @@
-from typing import Any
+import asyncio
+import json
+import os
+import re
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from httpx import HTTPError
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
-import os
 load_dotenv()
 
 from run_retrieval import (
@@ -43,6 +48,16 @@ class RetrievalResponse(BaseModel):
     chunks: list[dict[str, Any]]
     finalAnswer: str
     context: str | None = None
+    citations: list[RetrievalCitation] = Field(default_factory=list)
+    followUpSuggestions: list[str] = Field(default_factory=list)
+
+
+class FeedbackRequest(BaseModel):
+    message_id: str = Field(..., min_length=1)
+    conversation_id: str | None = None
+    rating: Literal["up", "down"]
+    question: str | None = None
+    answer: str = Field(..., min_length=1)
     citations: list[RetrievalCitation] = Field(default_factory=list)
 
 
@@ -106,6 +121,129 @@ def getCorsOrigins():
     ]
 
 
+def getUniqueSuggestions(candidates: list[str], limit: int = 3) -> list[str]:
+    seen = set()
+    suggestions = []
+    for candidate in candidates:
+        cleaned = re.sub(r"\s+", " ", str(candidate)).strip()
+        key = cleaned.lower()
+        if cleaned != "" and key not in seen:
+            suggestions.append(cleaned)
+            seen.add(key)
+        if len(suggestions) == limit:
+            return suggestions
+    return suggestions
+
+
+def getCitationTopic(citations: list[RetrievalCitation]) -> str:
+    for citation in citations:
+        rawTopic = citation.breadcrumb or citation.source
+        topicParts = [part.strip() for part in rawTopic.split(">") if part.strip() != ""]
+        if len(topicParts) > 0:
+            topic = topicParts[-1]
+            return topic[:72]
+    return "this policy"
+
+
+def buildFollowUpSuggestions(
+    answerText: str,
+    citations: list[RetrievalCitation],
+    chunks: list[dict[str, Any]],
+) -> list[str]:
+    normalizedAnswer = str(answerText).lower()
+    topic = getCitationTopic(citations)
+    candidates = []
+
+    if "attendance" in normalizedAnswer:
+        candidates.extend(["What happens if attendance is short?", "Are there attendance exceptions?"])
+    if "withdraw" in normalizedAnswer or "drop" in normalizedAnswer:
+        candidates.extend(["What is the withdrawal deadline?", "Does this affect GPA?"])
+    if "fee" in normalizedAnswer or "refund" in normalizedAnswer or "payment" in normalizedAnswer:
+        candidates.extend(["What is the refund rule?", "What happens after late payment?"])
+    if "cgpa" in normalizedAnswer or "gpa" in normalizedAnswer or "probation" in normalizedAnswer:
+        candidates.extend(["Explain academic probation", "How can a student recover?"])
+    if "exam" in normalizedAnswer or "midterm" in normalizedAnswer or "final" in normalizedAnswer:
+        candidates.extend(["What if an exam is missed?", "Explain makeup exam rules"])
+    if "admission" in normalizedAnswer or "eligibility" in normalizedAnswer or "merit" in normalizedAnswer:
+        candidates.extend(["Explain eligibility criteria", "How is merit calculated?"])
+
+    if len(chunks) > 0:
+        candidates.append(f"What else does {topic} say?")
+        candidates.append(f"Summarize the source section on {topic}")
+
+    candidates.extend(["Explain this with an example", "What are the important deadlines?", "What should a student do next?"])
+    return getUniqueSuggestions(candidates)
+
+
+async def buildRetrievalResponse(payload: RetrievalRequest) -> RetrievalResponse:
+    print(f"Received question: {payload}")
+    conversationTurns = payload.history
+    apiKey = resolveApiKey(payload.api_key)
+    pipelineResult = await runRetrieval(
+        payload.question,
+        payload.model,
+        payload.top_k,
+        payload.source,
+        apiKey,
+        conversationTurns,
+    )
+    formattedContext = pipelineResult["context"]
+
+    firstMessageDict = await requestAnswerMessage(
+        payload.question,
+        formattedContext,
+        payload.model,
+        payload.max_tokens,
+        apiKey,
+        conversationTurns,
+    )
+    firstAnswerRaw = firstMessageDict.get("content", "")
+    firstAnswerNormalized = normalizeContentValue(firstAnswerRaw)
+    finalAnswer = firstAnswerNormalized.strip()
+
+    if payload.double_check:
+        finalAnswer = await requestSecondPass(
+            payload.question,
+            firstMessageDict,
+            payload.model,
+            payload.max_tokens,
+            apiKey,
+        )
+
+    citations = buildCitations(pipelineResult["chunks"])
+    return RetrievalResponse(
+        expandedQuestion=pipelineResult["expandedQuestion"],
+        hydePassage=pipelineResult["hydePassage"],
+        chunks=pipelineResult["chunks"],
+        finalAnswer=finalAnswer,
+        context=formattedContext if payload.show_context else None,
+        citations=citations,
+        followUpSuggestions=buildFollowUpSuggestions(finalAnswer, citations, pipelineResult["chunks"]),
+    )
+
+
+def encodeStreamEvent(eventName: str, payload: dict[str, Any]) -> str:
+    eventPayload = {"event": eventName, **payload}
+    return json.dumps(eventPayload, ensure_ascii=False) + "\n"
+
+
+async def streamRetrievalResponse(payload: RetrievalRequest):
+    try:
+        responsePayload = await buildRetrievalResponse(payload)
+        metadata = responsePayload.model_dump()
+        finalAnswer = metadata.pop("finalAnswer", "")
+        yield encodeStreamEvent("metadata", metadata)
+
+        answerParts = re.findall(r"\S+\s*", finalAnswer)
+        for answerPart in answerParts:
+            yield encodeStreamEvent("token", {"text": answerPart})
+            await asyncio.sleep(0.012)
+
+        yield encodeStreamEvent("done", {"finalAnswer": finalAnswer})
+    except Exception as streamError:
+        yield encodeStreamEvent("error", {"detail": str(streamError)})
+
+
 app = FastAPI(title="CampusIQ RAG API", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
@@ -124,49 +262,7 @@ def read_root():
 @app.post("/rag/retrieve", response_model=RetrievalResponse)
 async def rag_retrieve(payload: RetrievalRequest):
     try:
-        print(f"Received question: {payload}")
-        conversationTurns = payload.history
-        apiKey = resolveApiKey(payload.api_key)
-        pipelineResult = await runRetrieval(
-            payload.question,
-            payload.model,
-            payload.top_k,
-            payload.source,
-            apiKey,
-            conversationTurns,
-        )
-        formattedContext = pipelineResult["context"]
-
-        firstMessageDict = await requestAnswerMessage(
-            payload.question,
-            formattedContext,
-            payload.model,
-            payload.max_tokens,
-            apiKey,
-            conversationTurns,
-        )
-        firstAnswerRaw = firstMessageDict.get("content", "")
-        firstAnswerNormalized = normalizeContentValue(firstAnswerRaw)
-        finalAnswer = firstAnswerNormalized.strip()
-
-        if payload.double_check:
-            finalAnswer = await requestSecondPass(
-                payload.question,
-                firstMessageDict,
-                payload.model,
-                payload.max_tokens,
-                apiKey,
-            )
-
-        responsePayload = RetrievalResponse(
-            expandedQuestion=pipelineResult["expandedQuestion"],
-            hydePassage=pipelineResult["hydePassage"],
-            chunks=pipelineResult["chunks"],
-            finalAnswer=finalAnswer,
-            context=formattedContext if payload.show_context else None,
-            citations=buildCitations(pipelineResult["chunks"]),
-        )
-        return responsePayload
+        return await buildRetrievalResponse(payload)
     except RuntimeError as runtimeError:
         runtimeDetail = str(runtimeError)
         loweredDetail = runtimeDetail.lower()
@@ -177,3 +273,25 @@ async def rag_retrieve(payload: RetrievalRequest):
         raise HTTPException(status_code=502, detail=f"LLM request failed: {requestError}") from requestError
     except Exception as unknownError:
         raise HTTPException(status_code=500, detail=f"Unexpected server error: {unknownError}") from unknownError
+
+
+@app.post("/rag/retrieve/stream")
+async def rag_retrieve_stream(payload: RetrievalRequest):
+    return StreamingResponse(streamRetrievalResponse(payload), media_type="application/x-ndjson")
+
+
+@app.post("/feedback")
+async def save_feedback(payload: FeedbackRequest):
+    os.makedirs("feedback", exist_ok=True)
+    feedbackRecord = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "message_id": payload.message_id,
+        "conversation_id": payload.conversation_id,
+        "rating": payload.rating,
+        "question": payload.question,
+        "answer": payload.answer,
+        "citations": [citation.model_dump() for citation in payload.citations],
+    }
+    with open(os.path.join("feedback", "feedback.jsonl"), "a", encoding="utf-8") as feedbackFile:
+        feedbackFile.write(json.dumps(feedbackRecord, ensure_ascii=False) + "\n")
+    return {"saved": True}

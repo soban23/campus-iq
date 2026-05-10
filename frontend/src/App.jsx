@@ -81,6 +81,12 @@ function normalizeStoredMessages(rawMessages) {
     content: message.content,
     createdAt: typeof message.createdAt === 'string' ? message.createdAt : undefined,
     citations: Array.isArray(message.citations) ? message.citations : [],
+    chunks: Array.isArray(message.chunks) ? message.chunks : [],
+    expandedQuestion: typeof message.expandedQuestion === 'string' ? message.expandedQuestion : undefined,
+    hydePassage: typeof message.hydePassage === 'string' ? message.hydePassage : undefined,
+    context: typeof message.context === 'string' ? message.context : undefined,
+    followUpSuggestions: Array.isArray(message.followUpSuggestions) ? message.followUpSuggestions : [],
+    feedback: ['up', 'down'].includes(message.feedback) ? message.feedback : undefined,
   }))
 
   if (!messages.some((message) => message.id === 'welcome')) {
@@ -139,6 +145,12 @@ function prepareMessagesForStorage(messages) {
     content: message.content,
     createdAt: message.createdAt,
     citations: Array.isArray(message.citations) ? message.citations : [],
+    chunks: Array.isArray(message.chunks) ? message.chunks : [],
+    expandedQuestion: message.expandedQuestion,
+    hydePassage: message.hydePassage,
+    context: message.context,
+    followUpSuggestions: Array.isArray(message.followUpSuggestions) ? message.followUpSuggestions : [],
+    feedback: ['up', 'down'].includes(message.feedback) ? message.feedback : undefined,
   }))
 }
 
@@ -277,13 +289,30 @@ function getUniqueSuggestions(candidates) {
   return unique
 }
 
-function buildFollowUpSuggestions(answerText) {
+function getCitationTopic(citations) {
+  for (const citation of citations) {
+    const rawTopic = citation?.breadcrumb || citation?.source
+    if (typeof rawTopic === 'string' && rawTopic.trim() !== '') {
+      const topicParts = rawTopic
+        .split('>')
+        .map((part) => part.trim())
+        .filter(Boolean)
+      if (topicParts.length > 0) {
+        return topicParts[topicParts.length - 1].slice(0, 72)
+      }
+    }
+  }
+  return 'this policy'
+}
+
+function buildFollowUpSuggestions(answerText, citations = [], chunks = []) {
   const normalizedAnswer = String(answerText).toLowerCase()
   if (normalizedAnswer.trim() === '') {
     return []
   }
 
   const candidates = []
+  const topic = getCitationTopic(citations)
   if (normalizedAnswer.includes('attendance')) {
     candidates.push('What happens if attendance is short?', 'Summarize the attendance rules', 'Is there any exception?')
   }
@@ -302,9 +331,20 @@ function buildFollowUpSuggestions(answerText) {
   if (normalizedAnswer.includes('admission') || normalizedAnswer.includes('eligibility') || normalizedAnswer.includes('merit')) {
     candidates.push('Explain eligibility criteria', 'How is merit calculated?', 'What documents are required?')
   }
+  if (citations.length > 0 || chunks.length > 0) {
+    candidates.push(`What else does ${topic} say?`, `Summarize the source section on ${topic}`)
+  }
 
   candidates.push('Explain this further', 'Summarize this topic', 'Give a practical example')
   return getUniqueSuggestions(candidates)
+}
+
+function safeJsonParse(line) {
+  try {
+    return JSON.parse(line)
+  } catch {
+    return null
+  }
 }
 
 function App() {
@@ -324,6 +364,7 @@ function App() {
   const latestAssistantMessageId = [...messages]
     .reverse()
     .find((message) => message.role === 'assistant' && message.id !== 'welcome')?.id
+  const hasStreamingAssistant = messages.some((message) => message.role === 'assistant' && message.isStreaming)
 
   useEffect(() => {
     const startupTimer = window.setTimeout(() => {
@@ -407,7 +448,36 @@ function App() {
     setCopiedMessageId('')
 
     try {
-      const response = await fetch(`${API_BASE_URL}/rag/retrieve`, {
+      const assistantMessageId = createMessageId('a')
+      const assistantStartedAt = new Date().toISOString()
+      const upsertAssistantMessage = (updater) => {
+        updateConversationMessages(targetConversationId, (previousMessages) => {
+          const existingIndex = previousMessages.findIndex((message) => message.id === assistantMessageId)
+          const baseMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: '',
+            createdAt: assistantStartedAt,
+            citations: [],
+            chunks: [],
+            followUpSuggestions: [],
+            isStreaming: true,
+          }
+
+          if (existingIndex === -1) {
+            return [...previousMessages, updater(baseMessage)]
+          }
+
+          return previousMessages.map((message) => {
+            if (message.id !== assistantMessageId) {
+              return message
+            }
+            return updater(message)
+          })
+        })
+      }
+
+      const response = await fetch(`${API_BASE_URL}/rag/retrieve/stream`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -416,24 +486,84 @@ function App() {
         }),
       })
 
-      const data = await response.json().catch(() => ({}))
       if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
         const detail = typeof data?.detail === 'string' ? data.detail : 'Request failed.'
         throw new Error(detail)
       }
-
-      const assistantMessage = {
-        id: createMessageId('a'),
-        role: 'assistant',
-        content: data.finalAnswer ?? 'No answer returned.',
-        createdAt: new Date().toISOString(),
-        expandedQuestion: data.expandedQuestion,
-        hydePassage: data.hydePassage,
-        context: data.context,
-        citations: Array.isArray(data.citations) ? data.citations : [],
-        chunks: Array.isArray(data.chunks) ? data.chunks : [],
+      if (!response.body) {
+        throw new Error('Streaming is not available in this browser.')
       }
-      updateConversationMessages(targetConversationId, (previousMessages) => [...previousMessages, assistantMessage])
+
+      upsertAssistantMessage((message) => message)
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let bufferedText = ''
+      let streamedAnswer = ''
+
+      const processStreamEvent = (streamEvent) => {
+        if (!streamEvent || typeof streamEvent.event !== 'string') {
+          return
+        }
+
+        if (streamEvent.event === 'metadata') {
+          upsertAssistantMessage((message) => ({
+            ...message,
+            expandedQuestion: streamEvent.expandedQuestion,
+            hydePassage: streamEvent.hydePassage,
+            context: streamEvent.context,
+            citations: Array.isArray(streamEvent.citations) ? streamEvent.citations : [],
+            chunks: Array.isArray(streamEvent.chunks) ? streamEvent.chunks : [],
+            followUpSuggestions: Array.isArray(streamEvent.followUpSuggestions) ? streamEvent.followUpSuggestions : [],
+          }))
+          return
+        }
+
+        if (streamEvent.event === 'token') {
+          const nextText = typeof streamEvent.text === 'string' ? streamEvent.text : ''
+          streamedAnswer += nextText
+          upsertAssistantMessage((message) => ({
+            ...message,
+            content: streamedAnswer,
+            isStreaming: true,
+          }))
+          return
+        }
+
+        if (streamEvent.event === 'done') {
+          const finalAnswer = typeof streamEvent.finalAnswer === 'string' ? streamEvent.finalAnswer : streamedAnswer
+          upsertAssistantMessage((message) => ({
+            ...message,
+            content: finalAnswer || 'No answer returned.',
+            isStreaming: false,
+          }))
+          return
+        }
+
+        if (streamEvent.event === 'error') {
+          throw new Error(streamEvent.detail || 'Request failed.')
+        }
+      }
+
+      let isDone = false
+      while (!isDone) {
+        const { value, done } = await reader.read()
+        isDone = done
+        bufferedText += decoder.decode(value ?? new Uint8Array(), { stream: !done })
+        const lines = bufferedText.split('\n')
+        bufferedText = lines.pop() ?? ''
+
+        for (const line of lines) {
+          const cleanLine = line.trim()
+          if (cleanLine !== '') {
+            processStreamEvent(safeJsonParse(cleanLine))
+          }
+        }
+      }
+
+      if (bufferedText.trim() !== '') {
+        processStreamEvent(safeJsonParse(bufferedText.trim()))
+      }
     } catch (requestError) {
       const failureMessage = getSafeErrorMessage(requestError)
       setError(failureMessage)
@@ -515,6 +645,52 @@ function App() {
       }, 1400)
     } catch {
       setError('Unable to copy response.')
+    }
+  }
+
+  const submitFeedback = async (message, rating) => {
+    if (!activeConversation || message.role !== 'assistant' || message.id === 'welcome') {
+      return
+    }
+
+    const assistantIndex = messages.findIndex((currentMessage) => currentMessage.id === message.id)
+    const previousQuestion =
+      messages
+        .slice(0, assistantIndex)
+        .reverse()
+        .find((currentMessage) => currentMessage.role === 'user')?.content ?? ''
+
+    updateConversationMessages(activeConversation.id, (previousMessages) =>
+      previousMessages.map((currentMessage) =>
+        currentMessage.id === message.id ? { ...currentMessage, feedback: rating } : currentMessage,
+      ),
+    )
+
+    try {
+      const normalizedCitations = getMessageCitations(message).map((citation) => ({
+        source: citation.source,
+        chunk_index: citation.chunkIndex,
+        relevance: citation.relevance,
+        breadcrumb: citation.breadcrumb,
+      }))
+      const response = await fetch(`${API_BASE_URL}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message_id: message.id,
+          conversation_id: activeConversation.id,
+          rating,
+          question: previousQuestion,
+          answer: message.content,
+          citations: normalizedCitations,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Feedback could not be saved.')
+      }
+    } catch {
+      setError('Feedback saved in chat, but could not be written to the server.')
     }
   }
 
@@ -676,7 +852,9 @@ function App() {
               const isLatestAssistant = message.id === latestAssistantMessageId
               const followUpSuggestions =
                 message.role === 'assistant' && message.id !== 'welcome'
-                  ? buildFollowUpSuggestions(message.content)
+                  ? Array.isArray(message.followUpSuggestions) && message.followUpSuggestions.length > 0
+                    ? message.followUpSuggestions.slice(0, 3)
+                    : buildFollowUpSuggestions(message.content, citations, message.chunks)
                   : []
 
               return (
@@ -706,7 +884,11 @@ function App() {
                         : '◆ CampusIQ'}
                   </header>
                   {message.role === 'assistant' ? (
-                    <div className="message-content max-w-full overflow-hidden break-words text-sm leading-relaxed text-[#ccc]">
+                    <div
+                      className={`message-content max-w-full overflow-hidden break-words text-sm leading-relaxed text-[#ccc] ${
+                        message.isStreaming ? 'streaming-response' : ''
+                      }`}
+                    >
                       <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                         {message.content}
                       </ReactMarkdown>
@@ -734,6 +916,32 @@ function App() {
                           Retry
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => submitFeedback(message, 'up')}
+                        disabled={message.isStreaming}
+                        className={`min-h-9 border px-3 py-2 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors disabled:opacity-30 ${
+                          message.feedback === 'up'
+                            ? 'border-[#999] bg-[#e8e8e8] text-[#0a0a0a]'
+                            : 'border-[#282828] bg-[#0a0a0a] text-[#666] hover:border-[#555] hover:text-[#e8e8e8]'
+                        }`}
+                        aria-pressed={message.feedback === 'up'}
+                      >
+                        + Good
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => submitFeedback(message, 'down')}
+                        disabled={message.isStreaming}
+                        className={`min-h-9 border px-3 py-2 font-mono-ui text-[10px] font-semibold uppercase tracking-[0.15em] transition-colors disabled:opacity-30 ${
+                          message.feedback === 'down'
+                            ? 'border-[#999] bg-[#e8e8e8] text-[#0a0a0a]'
+                            : 'border-[#282828] bg-[#0a0a0a] text-[#666] hover:border-[#555] hover:text-[#e8e8e8]'
+                        }`}
+                        aria-pressed={message.feedback === 'down'}
+                      >
+                        - Needs Fix
+                      </button>
                     </div>
                   )}
 
@@ -847,7 +1055,7 @@ function App() {
               )
             })}
 
-            {isSending && (
+            {isSending && !hasStreamingAssistant && (
               <div className="mr-auto inline-flex items-center gap-3 border border-[#282828] bg-[#111] px-4 py-3 text-sm text-[#888]">
                 <span className="flex gap-1.5">
                   <span className="retro-dot" style={{ width: 6, height: 6 }} />

@@ -17,6 +17,7 @@ __pycache__/
 # Logs
 logs
 *.log
+feedback/*.jsonl
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

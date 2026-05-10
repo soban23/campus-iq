@@ -75,6 +75,17 @@ select {
   white-space: pre-wrap;
 }
 
+.streaming-response::after {
+  content: '';
+  display: inline-block;
+  width: 0.55rem;
+  height: 1rem;
+  margin-left: 0.2rem;
+  background: var(--retro-white);
+  vertical-align: -0.15rem;
+  animation: cursor-blink 1s step-end infinite;
+}
+
 /* ─── FONT UTILITIES ─── */
 .font-display {
   font-family: 'Space Mono', 'IBM Plex Mono', monospace;
