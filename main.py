@@ -30,12 +30,64 @@ class RetrievalRequest(BaseModel):
     history: list[dict[str, str]] = Field(default_factory=list)
 
 
+class RetrievalCitation(BaseModel):
+    source: str
+    chunk_index: int | None = None
+    relevance: float | None = None
+    breadcrumb: str | None = None
+
+
 class RetrievalResponse(BaseModel):
     expandedQuestion: str
     hydePassage: str
     chunks: list[dict[str, Any]]
     finalAnswer: str
     context: str | None = None
+    citations: list[RetrievalCitation] = Field(default_factory=list)
+
+
+def buildCitations(chunks: list[dict[str, Any]]) -> list[RetrievalCitation]:
+    citations = []
+    for position, chunk in enumerate(chunks):
+        if not isinstance(chunk, dict):
+            chunk = {}
+        metadata = chunk.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        rawSource = metadata.get("source") or metadata.get("file") or metadata.get("document")
+        source = str(rawSource).strip() if rawSource is not None else ""
+        if source == "":
+            source = "unknown source"
+
+        rawChunkIndex = metadata.get("chunk_index", position)
+        chunkIndex = None
+        try:
+            chunkIndex = int(rawChunkIndex)
+        except (TypeError, ValueError):
+            chunkIndex = position
+
+        rawScore = chunk.get("score")
+        relevance = None
+        try:
+            relevance = float(rawScore)
+        except (TypeError, ValueError):
+            relevance = None
+
+        rawBreadcrumb = metadata.get("breadcrumb")
+        breadcrumb = str(rawBreadcrumb).strip() if rawBreadcrumb is not None else None
+        if breadcrumb == "":
+            breadcrumb = None
+
+        citations.append(
+            RetrievalCitation(
+                source=source,
+                chunk_index=chunkIndex,
+                relevance=relevance,
+                breadcrumb=breadcrumb,
+            )
+        )
+    return citations
 
 
 def getCorsOrigins():
@@ -112,6 +164,7 @@ async def rag_retrieve(payload: RetrievalRequest):
             chunks=pipelineResult["chunks"],
             finalAnswer=finalAnswer,
             context=formattedContext if payload.show_context else None,
+            citations=buildCitations(pipelineResult["chunks"]),
         )
         return responsePayload
     except RuntimeError as runtimeError:

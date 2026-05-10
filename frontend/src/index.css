@@ -33,10 +33,46 @@ body {
   font-family: 'IBM Plex Mono', 'Courier New', monospace;
   background: var(--retro-black);
   color: var(--retro-white);
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
+  overflow-x: hidden;
+}
+
+button,
+select,
+textarea,
+summary {
+  touch-action: manipulation;
+}
+
+button,
+select {
+  -webkit-tap-highlight-color: transparent;
+}
+
+.chat-shell {
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.chat-log {
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 1rem;
+}
+
+.message-card,
+.message-content {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.message-content pre,
+.message-content code {
+  white-space: pre-wrap;
 }
 
 /* ─── FONT UTILITIES ─── */
@@ -273,4 +309,28 @@ details[open] summary::before {
 
 .thinking-dot {
   animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+@media (max-width: 640px) {
+  .crt-scanlines::before {
+    background-size: 100% 3px;
+  }
+
+  .chat-log {
+    max-height: none;
+  }
+
+  .chat-controls {
+    width: 100%;
+  }
+
+  .message-card details summary {
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+  }
+
+  .message-content table {
+    min-width: 520px;
+  }
 }
