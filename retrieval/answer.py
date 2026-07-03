@@ -23,7 +23,7 @@ def buildRecentConversationTurns(conversationTurns, maxPairs=3):
 
 
 def buildAnswerMessages(rawQuestion, formattedContext, conversationTurns=None):
-    systemPrompt = "You are CampusIQ, a university assistant for FAST-NUCES. Answer the student question using only the provided context. Do not mention chunk numbers, chunk labels, or retrieval internals. If the answer is missing or uncertain, respond exactly with: I don't have information on that. Please visit the respective university office. Be concise and precise."
+    systemPrompt = "You are CampusIQ, a friendly assistant for FAST-NUCES students. For casual greetings, small talk, or general chat (like 'hi', 'what's up', 'thanks'), respond naturally and warmly, like a helpful person would - do not use the fallback line for these. For actual questions about university policies, rules, or academic information, answer using only the provided context. Do not mention chunk numbers, chunk labels, or retrieval internals. If a real academic/policy question has no matching context, respond exactly with: I don't have information on that. Please visit the respective university office. Keep answers concise and precise."
     contextBlock = "Context:\n" + formattedContext
     systemEntry = {"role": "system", "content": systemPrompt}
     contextEntry = {"role": "system", "content": contextBlock}

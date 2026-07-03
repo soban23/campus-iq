@@ -299,7 +299,7 @@ async def requestSecondPass(questionText, firstMessageDict, modelName, maxTokens
 
 async def runRetrieval(questionText, modelName, topK, sourceFile, apiKey, conversationTurns=None):
     print(f"[RAG] Starting retrieval with requested model={modelName}")
-    recentUserMessages = extractRecentUserMessages(conversationTurns, maxMessages=2)
+    recentUserMessages = extractRecentUserMessages(conversationTurns, maxMessages=20)
     expandedQuestion = await requestExpandedQuestion(questionText, modelName, apiKey, recentUserMessages) #raw query to expanded query(punctuation, synonyms, related terms)
     # sleep(3)
     hydePassage = await requestHydePassage(expandedQuestion, modelName, apiKey, recentUserMessages)#expanded query to hyde passage (sample answer without context)

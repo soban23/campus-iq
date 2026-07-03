@@ -275,65 +275,7 @@ function App() {
                   <p className="whitespace-pre-wrap leading-relaxed">{message.content}</p>
                 )}
 
-                {message.role === 'assistant' && message.expandedQuestion && (
-                  <details className="mt-3 border border-[#282828] bg-[#0d0d0d] p-3">
-                    <summary className="cursor-pointer font-mono-ui text-[10px] font-semibold uppercase tracking-[0.15em] text-[#666] hover:text-[#999] transition-colors">
-                      ▸ Retrieval Details
-                    </summary>
-                    <div className="mt-3 space-y-3 text-xs text-[#888]">
-                      <div>
-                        <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
-                          Expanded Query:
-                        </p>
-                        <pre className="max-h-44 overflow-y-auto whitespace-pre-wrap break-words border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
-                          {message.expandedQuestion}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
-                          HyDE Passage:
-                        </p>
-                        <pre className="max-h-52 overflow-y-auto whitespace-pre-wrap break-words border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
-                          {message.hydePassage}
-                        </pre>
-                      </div>
-                      {message.context && (
-                        <div>
-                          <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
-                            Context:
-                          </p>
-                          <p className="max-h-44 overflow-y-auto border border-[#222] bg-[#0a0a0a] p-2 font-mono-ui text-[11px] text-[#777]">
-                            {message.context}
-                          </p>
-                        </div>
-                      )}
-                      {Array.isArray(message.chunks) && message.chunks.length > 0 && (
-                        <div>
-                          <p className="font-mono-ui text-[10px] uppercase tracking-wider text-[#555] mb-1">
-                            Retrieved Chunks:
-                          </p>
-                          <ul className="space-y-1">
-                            {message.chunks.slice(0, 5).map((chunk, index) => {
-                              const breadcrumb =
-                                chunk?.metadata?.breadcrumb ?? chunk?.metadata?.source ?? 'unknown'
-                              const score = Number.isFinite(chunk?.score) ? chunk.score.toFixed(3) : 'n/a'
-                              return (
-                                <li
-                                  key={`${message.id}-${index}`}
-                                  className="border border-[#222] bg-[#0a0a0a] px-2 py-1 font-mono-ui text-[11px] text-[#666]"
-                                >
-                                  <span className="text-[#888]">{index + 1}.</span> {breadcrumb}{' '}
-                                  <span className="text-[#444]">│</span> score{' '}
-                                  <span className="text-[#999]">{score}</span>
-                                </li>
-                              )
-                            })}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  </details>
-                )}
+
               </article>
             ))}
 
