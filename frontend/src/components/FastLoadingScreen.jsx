@@ -21,22 +21,7 @@ function FastLoadingScreen() {
       />
 
       <div className="relative z-10 flex flex-col items-center gap-6 px-6 text-center">
-        {/* ASCII art logo frame */}
-        <div className="font-mono-ui text-[10px] leading-tight tracking-wider text-[#555] select-none">
-          <pre className="inline-block text-left">
-{`┌────────────────────────┐
-│                        │
-│   ╔═╗╔═╗╔╦╗╔═╗╦ ╦╔═╗   │
-│   ║  ╠═╣║║║╠═╝║ ║╚═╗   │
-│   ╚═╝╩ ╩╩ ╩╩  ╚═╝╚═╝   │
-│         ╦╔═╗           │
-│         ║║═╬╗          │
-│         ╩╚═╝╚          │
-│                        │
-└────────────────────────┘`}
-          </pre>
-        </div>
-
+        
         {/* Title */}
         <div>
           <h1 className="font-display text-2xl font-bold tracking-[0.15em] text-[#e8e8e8] retro-glow uppercase">
